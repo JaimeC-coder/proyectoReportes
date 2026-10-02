@@ -1,0 +1,66 @@
+@import 'sweetalert2/dist/sweetalert2.min.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+@layer components {
+    .card {
+        @apply rounded-xl border border-gray-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800;
+    }
+    .field-label {
+        @apply mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300;
+    }
+    .field-input {
+        @apply block w-full rounded-md border-gray-300 text-sm shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:border-slate-600 dark:bg-slate-900 dark:text-gray-100;
+    }
+    .btn-icon {
+        @apply inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 transition hover:bg-gray-100 hover:text-gray-900 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-slate-700 dark:hover:text-white;
+    }
+}
+
+/* ---- Editor Tiptap ---- */
+.tiptap-toolbar button {
+    @apply inline-flex h-8 min-w-[2rem] items-center justify-center rounded px-1.5 text-sm text-gray-600 transition hover:bg-gray-200 dark:text-gray-300 dark:hover:bg-slate-600;
+}
+.tiptap-toolbar button.is-active {
+    @apply bg-primary-100 text-primary-700 dark:bg-primary-900/60 dark:text-primary-200;
+}
+.tiptap-toolbar .sep {
+    @apply mx-1 h-5 w-px bg-gray-300 dark:bg-slate-600;
+}
+.tiptap {
+    @apply min-h-[140px] px-3 py-2 text-sm text-gray-800 focus:outline-none dark:text-gray-100;
+}
+.tiptap p { @apply my-1; }
+.tiptap ul { @apply my-1 list-disc pl-6; }
+.tiptap ol { @apply my-1 list-decimal pl-6; }
+.tiptap h2 { @apply mt-2 text-lg font-bold; }
+.tiptap h3 { @apply mt-2 text-base font-bold; }
+.tiptap blockquote { @apply border-l-4 border-gray-300 pl-3 italic text-gray-600 dark:border-slate-500 dark:text-gray-300; }
+.tiptap a { @apply text-primary-600 underline; }
+.tiptap mark { @apply rounded bg-yellow-200 px-0.5 dark:bg-yellow-600/60; }
+.tiptap img { @apply my-2 max-h-72 max-w-full rounded border border-gray-200; }
+.tiptap img.ProseMirror-selectednode { @apply ring-2 ring-primary-500; }
+.tiptap table { @apply my-2 w-full table-fixed border-collapse overflow-hidden; }
+.tiptap td, .tiptap th { @apply relative border border-gray-300 px-2 py-1 align-top dark:border-slate-500; }
+.tiptap th { @apply bg-gray-100 font-semibold dark:bg-slate-700; }
+.tiptap .selectedCell:after { content: ''; @apply pointer-events-none absolute inset-0 bg-primary-200/40; }
+.tiptap .column-resize-handle { @apply pointer-events-none absolute -right-0.5 bottom-0 top-0 w-1 bg-primary-400; }
+.tiptap p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    @apply pointer-events-none float-left h-0 text-gray-400;
+}
+
+/* ---- Vista previa (hoja A4) ---- */
+.preview-sheet {
+    @apply mx-auto bg-white text-gray-900 shadow-lg ring-1 ring-black/5;
+    width: 100%;
+    max-width: 794px;
+    min-height: 1123px;
+    padding: 56px 56px 64px;
+}

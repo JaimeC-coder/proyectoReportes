@@ -13,7 +13,7 @@
         $cards = [
             ['label' => auth()->user()->can('reports.view_all') ? 'Informes totales' : 'Mis informes', 'value' => $stats['total'], 'icon' => 'document-text', 'color' => 'bg-primary-600'],
             ['label' => 'Este mes', 'value' => $stats['month'], 'icon' => 'calendar-days', 'color' => 'bg-emerald-600'],
-            ['label' => 'Hoy', 'value' => $stats['today'], 'icon' => 'clock', 'color' => 'bg-amber-500'],
+            ['label' => 'Borradores pendientes', 'value' => $stats['drafts'], 'icon' => 'pencil-square', 'color' => 'bg-amber-500'],
             ['label' => 'Plantillas activas', 'value' => $templatesCount, 'icon' => 'rectangle-group', 'color' => 'bg-violet-600'],
         ];
     @endphp
@@ -40,15 +40,18 @@
             <ul class="divide-y divide-gray-100 dark:divide-slate-700">
                 @forelse ($recent as $report)
                     <li>
-                        <a href="{{ route('reports.show', $report) }}" class="flex items-center gap-4 px-5 py-3 transition hover:bg-gray-50 dark:hover:bg-slate-700/40">
+                        <a href="{{ $report->isDraft() && auth()->user()->can('update', $report) ? route('reports.create', ['borrador' => $report->id]) : route('reports.show', $report) }}" class="flex items-center gap-4 px-5 py-3 transition hover:bg-gray-50 dark:hover:bg-slate-700/40">
                             <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-300">
                                 <x-w-icon name="document" class="h-5 w-5" />
                             </span>
                             <div class="min-w-0 flex-1">
                                 <p class="truncate text-sm font-medium text-gray-900 dark:text-white">{{ $report->title }}</p>
-                                <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $report->code }} · {{ $report->client_name ?: 'Sin cliente' }} · {{ $report->user->name }}</p>
+                                <p class="truncate text-xs text-gray-500 dark:text-gray-400">{{ $report->label() }} · {{ $report->client_name ?: 'Sin cliente' }} · {{ $report->user->name }}</p>
                             </div>
-                            <span class="hidden text-xs text-gray-400 sm:block">{{ $report->created_at->diffForHumans() }}</span>
+                            @if ($report->isDraft())
+                                <x-w-badge flat warning label="Borrador" />
+                            @endif
+                            <span class="hidden text-xs text-gray-400 sm:block">{{ $report->updated_at->diffForHumans() }}</span>
                         </a>
                     </li>
                 @empty

@@ -171,6 +171,102 @@ class ReportSystemTest extends TestCase
         $this->assertSame($source->id, $copy->duplicated_from_id);
     }
 
+    public function test_a_report_can_be_saved_as_draft_and_finished_later(): void
+    {
+        $this->actingAs($this->tech());
+        $template = Template::first();
+
+        // "Seguir editando después": se guarda sin imágenes, sin PDF y sin código.
+        Livewire::test(Create::class)
+            ->call('useTemplate', $template->id)
+            ->set('form.title', 'Informe a medias')
+            ->call('saveDraft')
+            ->assertHasNoErrors()
+            ->assertRedirect(route('reports.index'));
+
+        $draft = Report::firstOrFail();
+        $this->assertTrue($draft->isDraft());
+        $this->assertNull($draft->code);
+        $this->assertNull($draft->pdf_path);
+        $this->assertCount(6, $draft->sections);
+
+        // Se retoma el borrador, se completa y se finaliza.
+        $component = Livewire::test(Create::class, ['draftId' => $draft->id])
+            ->assertSet('editing', true)
+            ->assertSet('form.title', 'Informe a medias');
+
+        $gallery = collect($component->get('sections'))->firstWhere('type', 'gallery');
+        foreach (array_keys($gallery['content']['items']) as $i) {
+            $component->set("galleryItemUploads.{$gallery['uid']}.{$i}", UploadedFile::fake()->image("foto{$i}.jpg", 800, 600));
+        }
+
+        $component->set('form.title', 'Informe terminado')->call('save')->assertHasNoErrors();
+
+        $this->assertSame(1, Report::count());
+        $report = $draft->fresh();
+        $this->assertTrue($report->isFinal());
+        $this->assertSame('Informe terminado', $report->title);
+        $this->assertSame('INF-'.now()->year.'-0001', $report->code);
+        $this->assertNotNull($report->finalized_at);
+        Storage::disk('local')->assertExists($report->pdf_path);
+    }
+
+    private function draftOf(User $user): Report
+    {
+        return app(ReportService::class)->saveDraft(ReportData::fromArray([
+            'title' => 'Pendiente', 'service_date' => '2026-09-01',
+            'sections' => [['title' => 'Texto', 'type' => 'richtext', 'content' => ['html' => '<p>Hola</p>']]],
+        ]), $user);
+    }
+
+    public function test_a_draft_has_no_pdf_to_view(): void
+    {
+        $draft = $this->draftOf($this->tech());
+
+        $this->actingAs($this->tech())->get(route('reports.pdf', $draft))->assertForbidden();
+    }
+
+    public function test_a_draft_cannot_be_downloaded(): void
+    {
+        $draft = $this->draftOf($this->tech());
+
+        $this->actingAs($this->tech())->get(route('reports.download', $draft))->assertForbidden();
+    }
+
+    public function test_only_the_author_can_keep_editing_a_draft(): void
+    {
+        $draft = $this->draftOf($this->tech());
+
+        $this->assertTrue($this->tech()->can('update', $draft));
+        $this->assertFalse($this->admin()->can('update', $draft));
+        $this->assertFalse($this->tech()->can('duplicate', $draft));
+
+        $this->actingAs($this->admin())->get(route('reports.create', ['borrador' => $draft->id]))->assertForbidden();
+    }
+
+    public function test_a_finalized_report_can_no_longer_be_edited(): void
+    {
+        $report = $this->adminReport();
+
+        $this->assertFalse($this->admin()->can('update', $report));
+        $this->actingAs($this->admin())->get(route('reports.create', ['borrador' => $report->id]))->assertForbidden();
+
+        $this->expectException(\LogicException::class);
+        app(ReportService::class)->saveDraft(ReportData::fromArray([
+            'title' => 'Cambio', 'service_date' => '2026-09-01', 'sections' => [],
+        ]), $this->admin(), $report);
+    }
+
+    public function test_draft_page_renders_without_pdf_actions(): void
+    {
+        $draft = $this->draftOf($this->tech());
+
+        $this->actingAs($this->tech())->get(route('reports.show', $draft))
+            ->assertOk()
+            ->assertSee('Seguir editando')
+            ->assertDontSee('Descargar PDF');
+    }
+
     public function test_templates_can_be_created_with_custom_sections(): void
     {
         $this->actingAs($this->admin());

@@ -21,7 +21,7 @@ class Dashboard extends Component
             'stats' => $reports->stats($user),
             'templatesCount' => Template::active()->count(),
             'usersCount' => $user->can('users.manage') ? User::count() : null,
-            'recent' => $reports->visibleTo($user)->with(['user:id,name', 'template:id,name'])->latest('id')->limit(6)->get(),
+            'recent' => $reports->visibleTo($user)->with(['user:id,name', 'template:id,name'])->latest('updated_at')->latest('id')->limit(6)->get(),
         ]);
     }
 }

@@ -3,7 +3,7 @@
         <div class="flex items-center gap-2 text-sm">
             <a href="{{ route('reports.index') }}" class="text-gray-500 hover:text-primary-600 dark:text-gray-400">Informes</a>
             <x-w-icon name="chevron-right" class="h-4 w-4 text-gray-400" />
-            <h1 class="truncate font-semibold text-gray-900 dark:text-white">Nuevo informe</h1>
+            <h1 class="truncate font-semibold text-gray-900 dark:text-white">{{ $draftId ? 'Editar borrador' : 'Nuevo informe' }}</h1>
         </div>
     </x-slot>
 
@@ -43,6 +43,12 @@
         {{-- Paso 2: editor + vista previa --}}
         <div x-data="{ preview: false }" class="grid gap-6 xl:grid-cols-2">
             <div class="min-w-0 space-y-5 pb-24">
+                @if ($isDraft)
+                    <x-w-alert title="Estás editando un borrador" warning flat>
+                        Aún no tiene PDF ni código. Cuando termines, usa «Finalizar y generar PDF».
+                    </x-w-alert>
+                @endif
+
                 @if ($source)
                     <x-w-alert title="Duplicando el informe {{ $source->code }}" info flat>
                         El informe original no se modificará; se creará uno nuevo con un código distinto.
@@ -54,7 +60,7 @@
                         <h2 class="flex items-center gap-2 font-semibold text-gray-900 dark:text-white">
                             <x-w-icon name="information-circle" class="h-5 w-5 text-primary-500" /> Datos del informe
                         </h2>
-                        @unless ($source)
+                        @unless ($source || $isDraft)
                             <button type="button" class="text-xs text-gray-500 hover:text-primary-600"
                                     @click="confirmAction({ title: '¿Cambiar de plantilla?', text: 'Se perderán los cambios no guardados.' }).then(ok => ok && $wire.backToTemplates())">
                                 Cambiar plantilla
@@ -137,13 +143,14 @@
             {{-- Barra de acciones --}}
             <div class="fixed inset-x-0 bottom-0 z-30 border-t border-gray-200 bg-white/95 px-4 py-3 backdrop-blur lg:left-64 dark:border-slate-700 dark:bg-slate-900/95">
                 <div class="flex items-center justify-between gap-3">
-                    <p class="hidden text-xs text-gray-500 sm:block dark:text-gray-400">
-                        <x-w-icon name="lock-closed" class="inline h-4 w-4" /> Al guardar se genera el PDF y el informe ya no podrá editarse.
+                    <p class="hidden text-xs text-gray-500 md:block dark:text-gray-400">
+                        <x-w-icon name="lock-closed" class="inline h-4 w-4" /> El PDF se genera al finalizar. Después el informe ya no podrá editarse.
                     </p>
-                    <div class="flex flex-1 justify-end gap-2 sm:flex-none">
+                    <div class="flex flex-1 flex-wrap justify-end gap-2 md:flex-none">
                         <x-w-button outline secondary icon="eye" label="Vista previa" class="xl:hidden" @click="preview = true" />
-                        <x-w-button primary icon="document-check" label="Guardar y generar PDF" wire:loading.attr="disabled" wire:target="save"
-                                    @click="confirmAction({ title: '¿Guardar el informe?', text: 'Una vez guardado no podrá editarse; sólo visualizarse, descargarse o duplicarse.', confirmText: 'Sí, guardar', icon: 'question' }).then(ok => ok && $wire.save())" />
+                        <x-w-button outline primary icon="clock" label="Seguir editando después" wire:click="saveDraft" wire:loading.attr="disabled" wire:target="saveDraft,save" spinner="saveDraft" />
+                        <x-w-button primary icon="document-check" label="Finalizar y generar PDF" wire:loading.attr="disabled" wire:target="saveDraft,save"
+                                    @click="confirmAction({ title: '¿Finalizar el informe?', text: 'Se generará el PDF y ya no podrá editarse; sólo visualizarse, descargarse o duplicarse.', confirmText: 'Sí, finalizar', icon: 'question' }).then(ok => ok && $wire.save())" />
                     </div>
                 </div>
             </div>
@@ -151,7 +158,7 @@
             <div wire:loading.flex wire:target="save" class="fixed inset-0 z-[60] items-center justify-center bg-slate-900/60 backdrop-blur-sm">
                 <div class="card flex items-center gap-3 px-6 py-4">
                     <svg class="h-6 w-6 animate-spin text-primary-600" viewBox="0 0 24 24" fill="none"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"/></svg>
-                    <span class="font-medium">Guardando y generando PDF…</span>
+                    <span class="font-medium">Finalizando y generando PDF…</span>
                 </div>
             </div>
         </div>

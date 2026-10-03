@@ -18,6 +18,10 @@ class ReportPdfService
     /** Genera (o regenera) el PDF del informe y devuelve la ruta relativa en el disco privado. */
     public function generate(Report $report): string
     {
+        if (! $report->isFinal()) {
+            throw new \LogicException('Sólo los informes finalizados tienen PDF.');
+        }
+
         $settings = $this->settings->all();
 
         $pdf = Pdf::loadView('pdf.report', [

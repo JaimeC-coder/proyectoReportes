@@ -27,10 +27,12 @@ class ReportRepository
                     ->orWhere('client_name', 'like', "%{$search}%")
                     ->orWhere('client_location', 'like', "%{$search}%"));
             })
+            ->when($filters['status'] ?? null, fn (Builder $q, $status) => $q->where('status', $status))
             ->when($filters['template_id'] ?? null, fn (Builder $q, $id) => $q->where('template_id', $id))
             ->when($filters['user_id'] ?? null, fn (Builder $q, $id) => $q->where('user_id', $id))
             ->when($filters['from'] ?? null, fn (Builder $q, $d) => $q->whereDate('service_date', '>=', $d))
             ->when($filters['to'] ?? null, fn (Builder $q, $d) => $q->whereDate('service_date', '<=', $d))
+            ->latest('updated_at')
             ->latest('id')
             ->paginate($perPage);
     }
@@ -57,9 +59,9 @@ class ReportRepository
         $base = fn () => $this->visibleTo($user);
 
         return [
-            'total' => $base()->count(),
-            'month' => $base()->whereBetween('created_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
-            'today' => $base()->whereDate('created_at', today())->count(),
+            'total' => $base()->final()->count(),
+            'month' => $base()->final()->whereBetween('finalized_at', [now()->startOfMonth(), now()->endOfMonth()])->count(),
+            'drafts' => $base()->draft()->count(),
         ];
     }
 }

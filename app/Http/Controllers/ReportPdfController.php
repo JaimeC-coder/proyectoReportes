@@ -13,7 +13,7 @@ class ReportPdfController extends Controller
 
     public function show(Report $report): BinaryFileResponse
     {
-        Gate::authorize('view', $report);
+        Gate::authorize('download', $report);
 
         return response()->file($this->pdf->absolutePath($report), [
             'Content-Type' => 'application/pdf',
@@ -23,7 +23,7 @@ class ReportPdfController extends Controller
 
     public function download(Report $report): BinaryFileResponse
     {
-        Gate::authorize('view', $report);
+        Gate::authorize('download', $report);
 
         return response()->download($this->pdf->absolutePath($report), $report->pdfFileName());
     }

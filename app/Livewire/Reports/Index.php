@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Reports;
 
+use App\Enums\ReportStatus;
 use App\Models\Report;
 use App\Models\Template;
 use App\Models\User;
@@ -22,6 +23,9 @@ class Index extends Component
     #[Url(as: 'q', except: '')]
     public string $search = '';
 
+    #[Url(as: 'estado', except: '')]
+    public string $status = '';
+
     #[Url(except: '')]
     public string $template = '';
 
@@ -36,14 +40,14 @@ class Index extends Component
 
     public function updating($name): void
     {
-        if (in_array($name, ['search', 'template', 'author', 'from', 'to'], true)) {
+        if (in_array($name, ['search', 'status', 'template', 'author', 'from', 'to'], true)) {
             $this->resetPage();
         }
     }
 
     public function clearFilters(): void
     {
-        $this->reset(['search', 'template', 'author', 'from', 'to']);
+        $this->reset(['search', 'status', 'template', 'author', 'from', 'to']);
         $this->resetPage();
     }
 
@@ -53,7 +57,7 @@ class Index extends Component
         Gate::authorize('delete', $report);
         $report->delete();
 
-        $this->dispatch('toast', icon: 'success', title: "Informe {$report->code} eliminado");
+        $this->dispatch('toast', icon: 'success', title: $report->isDraft() ? 'Borrador descartado' : "Informe {$report->code} eliminado");
     }
 
     public function render(ReportRepository $reports)
@@ -63,6 +67,7 @@ class Index extends Component
         return view('livewire.reports.index', [
             'reports' => $reports->paginate($user, [
                 'search' => trim($this->search),
+                'status' => ReportStatus::tryFrom($this->status)?->value,
                 'template_id' => $this->template ?: null,
                 'user_id' => $user->can('reports.view_all') ? ($this->author ?: null) : null,
                 'from' => $this->from ?: null,

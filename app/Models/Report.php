@@ -2,13 +2,16 @@
 
 namespace App\Models;
 
+use App\Enums\ReportStatus;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
- * Un informe es inmutable: una vez creado sólo puede visualizarse,
+ * Un informe nace como BORRADOR (editable, sin PDF ni correlativo) o directamente
+ * FINALIZADO. Una vez finalizado es inmutable: sólo puede visualizarse,
  * descargarse o duplicarse (para crear uno nuevo a partir de él).
  */
 class Report extends Model
@@ -16,7 +19,7 @@ class Report extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'code', 'title', 'client_name', 'client_location', 'service_date',
+        'code', 'status', 'finalized_at', 'title', 'client_name', 'client_location', 'service_date',
         'template_id', 'user_id', 'duplicated_from_id', 'signature', 'client_signature', 'pdf_path',
     ];
 
@@ -24,6 +27,8 @@ class Report extends Model
     {
         return [
             'service_date' => 'date',
+            'status' => ReportStatus::class,
+            'finalized_at' => 'datetime',
             'signature' => 'array',
             'client_signature' => 'array',
         ];
@@ -47,6 +52,32 @@ class Report extends Model
     public function duplicatedFrom(): BelongsTo
     {
         return $this->belongsTo(self::class, 'duplicated_from_id');
+    }
+
+    public function isDraft(): bool
+    {
+        return $this->status === ReportStatus::Draft;
+    }
+
+    public function isFinal(): bool
+    {
+        return $this->status === ReportStatus::Final;
+    }
+
+    /** Código visible: el correlativo o "Borrador" mientras no se finaliza. */
+    public function label(): string
+    {
+        return $this->code ?? 'Borrador';
+    }
+
+    public function scopeFinal(Builder $query): Builder
+    {
+        return $query->where('status', ReportStatus::Final->value);
+    }
+
+    public function scopeDraft(Builder $query): Builder
+    {
+        return $query->where('status', ReportStatus::Draft->value);
     }
 
     public function pdfFileName(): string

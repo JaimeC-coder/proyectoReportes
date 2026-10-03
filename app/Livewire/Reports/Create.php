@@ -30,6 +30,10 @@ class Create extends Component
     #[Url(as: 'duplicar')]
     public ?int $duplicateId = null;
 
+    /** Borrador que se está continuando (?borrador=ID). */
+    #[Url(as: 'borrador')]
+    public ?int $draftId = null;
+
     /** Paso 1: elegir plantilla. Paso 2: editor. */
     public bool $editing = false;
 
@@ -48,7 +52,9 @@ class Create extends Component
 
     public function mount(ReportService $service): void
     {
-        if ($this->duplicateId) {
+        if ($this->draftId) {
+            $this->loadDraft($service->draftFromSavedDraft($this->currentDraft()));
+        } elseif ($this->duplicateId) {
             $source = Report::findOrFail($this->duplicateId);
             Gate::authorize('duplicate', $source);
             $this->loadDraft($service->draftFromReport($source));
@@ -79,7 +85,7 @@ class Create extends Component
 
     public function backToTemplates(): void
     {
-        $this->reset(['editing', 'templateId', 'duplicateId', 'sections']);
+        $this->reset(['editing', 'templateId', 'duplicateId', 'draftId', 'sections', 'form']);
     }
 
     protected function loadDraft(array $draft): void
@@ -107,34 +113,80 @@ class Create extends Component
         $this->reset('clientSignatureUpload');
     }
 
-    public function save(ReportService $service): void
+    /** Borrador en edición (re-autorizado en cada uso) o null si el informe es nuevo. */
+    protected function currentDraft(): ?Report
     {
-        $this->validateWithAlert(fn () => $this->validateReport());
+        if (! $this->draftId) {
+            return null;
+        }
 
-        $report = $service->create(ReportData::fromArray([
+        $draft = Report::findOrFail($this->draftId);
+        Gate::authorize('update', $draft);
+
+        return $draft;
+    }
+
+    protected function reportData(): ReportData
+    {
+        return ReportData::fromArray([
             ...$this->form,
             'sections' => array_values($this->sections),
-        ]), auth()->user());
+        ]);
+    }
+
+    /** "Seguir editando después": guarda como borrador, sin PDF, y vuelve al listado. */
+    public function saveDraft(ReportService $service): void
+    {
+        $this->validateWithAlert(fn () => $this->validateReport(final: false));
+
+        $report = $service->saveDraft($this->reportData(), auth()->user(), $this->currentDraft());
+        $this->draftId = $report->id;
 
         session()->flash('swal', [
             'icon' => 'success',
-            'title' => 'Informe '.$report->code.' creado',
+            'title' => 'Borrador guardado',
+            'text' => 'Puedes seguir editándolo cuando quieras desde "Mis informes". El PDF se generará al finalizarlo.',
+        ]);
+
+        $this->redirectRoute('reports.index');
+    }
+
+    /** Finaliza el informe: genera el PDF y ya no podrá editarse. */
+    public function save(ReportService $service): void
+    {
+        $this->validateWithAlert(fn () => $this->validateReport(final: true));
+
+        $report = $service->finalize($this->reportData(), auth()->user(), $this->currentDraft());
+
+        session()->flash('swal', [
+            'icon' => 'success',
+            'title' => 'Informe '.$report->code.' finalizado',
             'text' => 'El PDF se generó correctamente.',
         ]);
 
         $this->redirectRoute('reports.show', $report);
     }
 
-    protected function validateReport(): void
+    /**
+     * Un borrador sólo necesita título y fecha; al finalizar se exige
+     * el informe completo (al menos una sección y todas las imágenes).
+     */
+    protected function validateReport(bool $final): void
     {
-        $this->validate(array_merge([
+        $rules = array_merge([
             'form.title' => ['required', 'string', 'max:255'],
             'form.client_name' => ['nullable', 'string', 'max:255'],
             'form.client_location' => ['nullable', 'string', 'max:255'],
             'form.service_date' => ['required', 'date'],
             'form.client_signature.name' => ['nullable', 'string', 'max:150'],
             'form.client_signature.position' => ['nullable', 'string', 'max:150'],
-        ], $this->sectionRules()), $this->sectionMessages(), [
+        ], $this->sectionRules());
+
+        if (! $final) {
+            $rules['sections'] = ['array'];
+        }
+
+        $this->validate($rules, $this->sectionMessages(), [
             'form.title' => 'título',
             'form.client_name' => 'cliente',
             'form.client_location' => 'ubicación',
@@ -143,7 +195,7 @@ class Create extends Component
             'form.client_signature.position' => 'cargo de quien firma por el cliente',
         ] + $this->sectionAttributes());
 
-        if ($errors = $this->sectionBusinessErrors(requireImages: true)) {
+        if ($errors = $this->sectionBusinessErrors(requireImages: $final)) {
             throw ValidationException::withMessages($errors);
         }
     }
@@ -155,6 +207,7 @@ class Create extends Component
             'doc' => $this->editing ? $builder->fromDraft($this->form, $this->sections, $reports->signatureSnapshot(auth()->user())) : null,
             'settings' => $settings->all(),
             'logoSrc' => $settings->logoUrl(),
+            'isDraft' => (bool) $this->draftId,
             'source' => $this->form['duplicated_from_id'] ? Report::find($this->form['duplicated_from_id'], ['id', 'code']) : null,
         ]);
     }

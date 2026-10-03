@@ -5,6 +5,7 @@ namespace App\Livewire\Reports;
 use App\Models\Report;
 use App\Services\ReportDocumentBuilder;
 use App\Services\ReportPdfService;
+use App\Services\ReportService;
 use App\Services\SettingService;
 use Illuminate\Support\Facades\Gate;
 use Livewire\Attributes\Layout;
@@ -21,12 +22,17 @@ class Show extends Component
     public function mount(Report $report): void
     {
         Gate::authorize('view', $report);
-        $this->report = $report->load(['user:id,name', 'template:id,name', 'duplicatedFrom:id,code']);
+        $this->report = $report->load(['user', 'template:id,name', 'duplicatedFrom:id,code']);
+
+        // Un borrador no tiene PDF: sólo se muestra el documento.
+        if ($report->isDraft()) {
+            $this->view = 'html';
+        }
     }
 
     public function regenerate(ReportPdfService $pdf): void
     {
-        Gate::authorize('delete', $this->report); // sólo administradores
+        Gate::authorize('regenerate', $this->report);
         $pdf->generate($this->report);
         $this->dispatch('toast', icon: 'success', title: 'PDF regenerado con los ajustes actuales');
         $this->dispatch('pdf-reloaded');
@@ -37,16 +43,30 @@ class Show extends Component
         Gate::authorize('delete', $this->report);
         $this->report->delete();
 
-        session()->flash('toast', ['icon' => 'success', 'title' => "Informe {$this->report->code} eliminado"]);
+        session()->flash('toast', ['icon' => 'success', 'title' => $this->report->isDraft() ? 'Borrador descartado' : "Informe {$this->report->code} eliminado"]);
         $this->redirectRoute('reports.index');
     }
 
-    public function render(ReportDocumentBuilder $builder, SettingService $settings)
+    public function updatedView(): void
     {
+        if ($this->report->isDraft()) {
+            $this->view = 'html';
+        }
+    }
+
+    public function render(ReportDocumentBuilder $builder, SettingService $settings, ReportService $reports)
+    {
+        $doc = null;
+        if ($this->view === 'html') {
+            $doc = $builder->fromReport($this->report);
+            // El borrador aún no tiene la firma "congelada": se muestra la actual del autor.
+            $doc['signature'] ??= $reports->signatureSnapshot($this->report->user);
+        }
+
         return view('livewire.reports.show', [
-            'doc' => $this->view === 'html' ? $builder->fromReport($this->report) : null,
+            'doc' => $doc,
             'settings' => $settings->all(),
             'logoSrc' => $settings->logoUrl(),
-        ])->title($this->report->code);
+        ])->title($this->report->label());
     }
 }
